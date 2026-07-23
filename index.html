@@ -447,16 +447,16 @@ De l’audit à la mise en production, je mobilise ma double expertise terrain, 
         photoEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(CONFIG.name)}&background=0A66C2&color=fff&size=128`;
       };
 
-      // 4. Save Contact Button — generates a .vcf file and triggers a real download.
-      // A Blob + object-URL download is the one approach that behaves consistently
-      // across iOS Safari, Android Chrome, Samsung Internet, and in-app webviews
-      // (Instagram/LinkedIn/Twitter browsers). Custom URL schemes like intent: and
-      // data: navigation are blocked or unsupported in many of those contexts, and
-      // they fail *silently* — which is why the button can feel like it does nothing.
+      // 4. Save Contact Button (Opens contact import flow directly on mobile without forcing file download)
       const saveContactBtn = document.getElementById('saveContactBtn');
-      if (CONFIG.phone || CONFIG.email || CONFIG.vcardUrl) {
+      if (CONFIG.vcardUrl || CONFIG.phone || CONFIG.email) {
         saveContactBtn.addEventListener('click', (e) => {
           e.preventDefault();
+
+          if (CONFIG.vcardUrl) {
+            window.location.href = CONFIG.vcardUrl;
+            return;
+          }
 
           const cleanPhone = (CONFIG.phone || '').replace(/[^\d+]/g, '');
           const nameParts = (CONFIG.name || '').trim().split(' ');
@@ -469,26 +469,21 @@ De l’audit à la mise en production, je mobilise ma double expertise terrain, 
             `N:${lastName};${firstName};;;`,
             `FN:${CONFIG.name}`,
             `TITLE:${CONFIG.title || ''}`,
-            `TEL;TYPE=CELL,VOICE:${cleanPhone}`,
-            `EMAIL;TYPE=INTERNET,WORK:${CONFIG.email || ''}`,
+            `TEL;TYPE=CELL:${cleanPhone}`,
+            `EMAIL:${CONFIG.email || ''}`,
             `URL:${CONFIG.linkedinUrl || ''}`,
-            `URL:${CONFIG.githubUrl || ''}`,
-            `ADR;TYPE=WORK:;;${CONFIG.location || ''};;;;`,
             'END:VCARD'
           ].join('\r\n');
 
-          const blob = new Blob([vcardContent], { type: 'text/vcard;charset=utf-8' });
-          const blobUrl = URL.createObjectURL(blob);
+          const blob = new Blob([vcardContent], { type: 'text/vcard' });
+          const url = URL.createObjectURL(blob);
 
-          const tempLink = document.createElement('a');
-          tempLink.href = blobUrl;
-          tempLink.download = `${(CONFIG.name || 'contact').replace(/\s+/g, '_')}.vcf`;
-          document.body.appendChild(tempLink);
-          tempLink.click();
-          document.body.removeChild(tempLink);
+          // Navigate directly to vCard URL to trigger mobile Contacts import screen instead of file download
+          window.location.href = url;
 
-          // Free the memory used by the object URL shortly after the download starts
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+          setTimeout(() => {
+            URL.revokeObjectURL(url);
+          }, 5000);
         });
       } else {
         saveContactBtn.style.display = 'none';

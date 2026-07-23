@@ -299,7 +299,7 @@ De l’audit à la mise en production, je mobilise ma double expertise terrain, 
       email: "amine.elhend@gmail.com",   // Used in mailto: link
       linkedinUrl: "https://www.linkedin.com/in/amine-elhend/",
       githubUrl: "https://github.com/ZenleX-Dost",
-      
+
       // Contact Card (.vcf file for direct mobile Contacts app popup)
       vcardUrl: "./data/contact.vcf",
 
@@ -447,23 +447,18 @@ De l’audit à la mise en production, je mobilise ma double expertise terrain, 
         photoEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(CONFIG.name)}&background=0A66C2&color=fff&size=128`;
       };
 
-      // 4. Save Contact Button (Opens native mobile Contacts App editor directly)
+      // 4. Save Contact Button — generates a .vcf file and triggers a real download.
+      // A Blob + object-URL download is the one approach that behaves consistently
+      // across iOS Safari, Android Chrome, Samsung Internet, and in-app webviews
+      // (Instagram/LinkedIn/Twitter browsers). Custom URL schemes like intent: and
+      // data: navigation are blocked or unsupported in many of those contexts, and
+      // they fail *silently* — which is why the button can feel like it does nothing.
       const saveContactBtn = document.getElementById('saveContactBtn');
       if (CONFIG.phone || CONFIG.email || CONFIG.vcardUrl) {
         saveContactBtn.addEventListener('click', (e) => {
           e.preventDefault();
 
           const cleanPhone = (CONFIG.phone || '').replace(/[^\d+]/g, '');
-          const isAndroid = /Android/i.test(navigator.userAgent);
-
-          if (isAndroid) {
-            // Android Intent: Directly opens Android Contacts App insert screen with pre-filled fields (NO FILE DOWNLOAD)
-            const intentUrl = `intent:#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.dir/raw_contact;S.name=${encodeURIComponent(CONFIG.name)};S.phone=${encodeURIComponent(cleanPhone)};S.email=${encodeURIComponent(CONFIG.email || '')};S.job_title=${encodeURIComponent(CONFIG.title || '')};S.postal=${encodeURIComponent(CONFIG.location || '')};end`;
-            window.location.href = intentUrl;
-            return;
-          }
-
-          // iOS / iPhone & Fallback: Generate Base64 vCard URI to trigger native iOS Contact modal
           const nameParts = (CONFIG.name || '').trim().split(' ');
           const lastName = nameParts.length > 1 ? nameParts.pop() : '';
           const firstName = nameParts.join(' ') || CONFIG.name;
@@ -476,14 +471,24 @@ De l’audit à la mise en production, je mobilise ma double expertise terrain, 
             `TITLE:${CONFIG.title || ''}`,
             `TEL;TYPE=CELL,VOICE:${cleanPhone}`,
             `EMAIL;TYPE=INTERNET,WORK:${CONFIG.email || ''}`,
-            `URL;TYPE=LinkedIn:${CONFIG.linkedinUrl || ''}`,
-            `URL;TYPE=GitHub:${CONFIG.githubUrl || ''}`,
+            `URL:${CONFIG.linkedinUrl || ''}`,
+            `URL:${CONFIG.githubUrl || ''}`,
             `ADR;TYPE=WORK:;;${CONFIG.location || ''};;;;`,
             'END:VCARD'
           ].join('\r\n');
 
-          const base64Vcard = btoa(unescape(encodeURIComponent(vcardContent)));
-          window.location.href = 'data:text/vcard;base64,' + base64Vcard;
+          const blob = new Blob([vcardContent], { type: 'text/vcard;charset=utf-8' });
+          const blobUrl = URL.createObjectURL(blob);
+
+          const tempLink = document.createElement('a');
+          tempLink.href = blobUrl;
+          tempLink.download = `${(CONFIG.name || 'contact').replace(/\s+/g, '_')}.vcf`;
+          document.body.appendChild(tempLink);
+          tempLink.click();
+          document.body.removeChild(tempLink);
+
+          // Free the memory used by the object URL shortly after the download starts
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
         });
       } else {
         saveContactBtn.style.display = 'none';

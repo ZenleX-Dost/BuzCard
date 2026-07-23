@@ -447,31 +447,44 @@ De l’audit à la mise en production, je mobilise ma double expertise terrain, 
         photoEl.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(CONFIG.name)}&background=0A66C2&color=fff&size=128`;
       };
 
-      // 4. Save Contact Button (Triggers native mobile Contacts app preview/add card)
+      // 4. Save Contact Button (Opens native mobile Contacts App editor directly)
       const saveContactBtn = document.getElementById('saveContactBtn');
-      if (CONFIG.vcardUrl) {
-        saveContactBtn.href = CONFIG.vcardUrl;
-      } else if (CONFIG.phone || CONFIG.email) {
-        const cleanPhone = (CONFIG.phone || '').replace(/[^\d+]/g, '');
-        const nameParts = (CONFIG.name || '').trim().split(' ');
-        const lastName = nameParts.length > 1 ? nameParts.pop() : '';
-        const firstName = nameParts.join(' ') || CONFIG.name;
+      if (CONFIG.phone || CONFIG.email || CONFIG.vcardUrl) {
+        saveContactBtn.addEventListener('click', (e) => {
+          e.preventDefault();
 
-        const vcardData = [
-          'BEGIN:VCARD',
-          'VERSION:3.0',
-          `N:${lastName};${firstName};;;`,
-          `FN:${CONFIG.name}`,
-          `TITLE:${CONFIG.title || ''}`,
-          `TEL;TYPE=CELL,VOICE:${cleanPhone}`,
-          `EMAIL;TYPE=INTERNET,WORK:${CONFIG.email || ''}`,
-          `URL;TYPE=LinkedIn:${CONFIG.linkedinUrl || ''}`,
-          `URL;TYPE=GitHub:${CONFIG.githubUrl || ''}`,
-          `ADR;TYPE=WORK:;;${CONFIG.location || ''};;;;`,
-          'END:VCARD'
-        ].join('\n');
+          const cleanPhone = (CONFIG.phone || '').replace(/[^\d+]/g, '');
+          const isAndroid = /Android/i.test(navigator.userAgent);
 
-        saveContactBtn.href = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(vcardData);
+          if (isAndroid) {
+            // Android Intent: Directly opens Android Contacts App insert screen with pre-filled fields (NO FILE DOWNLOAD)
+            const intentUrl = `intent:#Intent;action=android.intent.action.INSERT;type=vnd.android.cursor.dir/raw_contact;S.name=${encodeURIComponent(CONFIG.name)};S.phone=${encodeURIComponent(cleanPhone)};S.email=${encodeURIComponent(CONFIG.email || '')};S.job_title=${encodeURIComponent(CONFIG.title || '')};S.postal=${encodeURIComponent(CONFIG.location || '')};end`;
+            window.location.href = intentUrl;
+            return;
+          }
+
+          // iOS / iPhone & Fallback: Generate Base64 vCard URI to trigger native iOS Contact modal
+          const nameParts = (CONFIG.name || '').trim().split(' ');
+          const lastName = nameParts.length > 1 ? nameParts.pop() : '';
+          const firstName = nameParts.join(' ') || CONFIG.name;
+
+          const vcardContent = [
+            'BEGIN:VCARD',
+            'VERSION:3.0',
+            `N:${lastName};${firstName};;;`,
+            `FN:${CONFIG.name}`,
+            `TITLE:${CONFIG.title || ''}`,
+            `TEL;TYPE=CELL,VOICE:${cleanPhone}`,
+            `EMAIL;TYPE=INTERNET,WORK:${CONFIG.email || ''}`,
+            `URL;TYPE=LinkedIn:${CONFIG.linkedinUrl || ''}`,
+            `URL;TYPE=GitHub:${CONFIG.githubUrl || ''}`,
+            `ADR;TYPE=WORK:;;${CONFIG.location || ''};;;;`,
+            'END:VCARD'
+          ].join('\r\n');
+
+          const base64Vcard = btoa(unescape(encodeURIComponent(vcardContent)));
+          window.location.href = 'data:text/vcard;base64,' + base64Vcard;
+        });
       } else {
         saveContactBtn.style.display = 'none';
       }
